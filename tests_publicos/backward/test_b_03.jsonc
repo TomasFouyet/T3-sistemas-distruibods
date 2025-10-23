@@ -1,0 +1,56 @@
+{
+    "VALIDATION": "backward",
+    "SERVERS": [
+        "R1",
+        "R2"
+    ],
+    // Información inicial de la base de datos
+    "DATA": {
+        "VAR_1": "juan carlos"
+    },
+    "TRANSACTIONS": [
+        // Comenzar Transacción 1
+        "T1;BEGIN",
+        "T1;READ;VAR_1",
+        
+        // Comenzar Transacción 2
+        "T2;BEGIN",
+        "T2;READ;VAR_1",
+        // T1 hace CAN_COMMIT para reservar variables, pero no commit
+        "T1;CAN_COMMIT;R1",
+        "T1;CAN_COMMIT;R2",
+
+        // R1 y R2 aceptan T2 porque no generó conflictos read-write
+        "T2;CAN_COMMIT;R1",
+        "T2;CAN_COMMIT;R2",
+
+        // Tanto T1 como T2 que leen la misma variable hacen commit
+        // porque ninguno generó conflictos read-write
+        "T2;COMMIT",
+        "T1;COMMIT",
+
+        // Comenzar Transacción 3
+        "T3;BEGIN",
+        "T3;WRITE;VAR_3,otro valor", // Escribo una nueva variable
+        "T3;READ;VAR_3", // Lectura exitosa porque T3 la escribió localmente
+        "T3;WRITE;VAR_1,AAA", // Se modifica VAR_1
+        "T3;WRITE;VAR_1,DELETE", // Se elimina VAR_1
+        // Consulta 1 - Ver valor consolidado de VAR_1: ("juan carlos")
+        "C;READ_POSSIBLE_VALUES;VAR_1", 
+        "T3;READ;VAR_1", // Lectura exitosa porque sigue existiendo en la base de datos consolidada
+
+        // R1 y R2 aceptan T3 porque no generó conflictos read-write. 
+        // Pero reservan VAR_1 porque fue modificada (write) para que
+        // otra transacción no pueda leerla
+        "T3;CAN_COMMIT;R1",
+        "T3;CAN_COMMIT;R2",
+
+        // Como WRITE;VAR_1,DELETE fue la última operación de T3 sobre VAR_1,
+        // al hacer commit se elimina de la base de datos consolidada
+        // y se escribe VAR_3 en la base de datos consolidada
+        "T3;COMMIT",
+
+        // Consulta 2 - Ver valor consolidado de VAR_1: (ya no existe)
+        "C;READ_COMMIT;VAR_1" 
+    ]
+}

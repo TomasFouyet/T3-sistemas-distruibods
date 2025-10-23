@@ -1,0 +1,32 @@
+{
+  // Estado inicial de la base de datos
+  "DATA": {
+    "cuenta_Guaripolo": "1000", // Este sueldo es malo
+    "cuenta_Bodoque": "500"
+  },
+
+  // Servidores del banco en distintas sucursales
+  "SERVERS": ["SucursalNorte", "SucursalSur", "SucursalCentro"],
+
+  "VALIDATION": "forward",
+
+  // Secuencia de eventos
+  "TRANSACTIONS": [
+    "C;READ_POSSIBLE_VALUES;cuenta_Guaripolo",
+    "C;READ_COMMIT;cuenta_Bodoque",
+    "T1;BEGIN",
+    "T1;READ;cuenta_Guaripolo",
+    "T1;WRITE;cuenta_Guaripolo,900",
+    "T1;WRITE;cuenta_Bodoque,600",
+    "T1;WRITE;cuenta_Tulio,123", 
+    "C;READ_POSSIBLE_VALUES;cuenta_Guaripolo",
+    "T1;WRITE;cuenta_Guaripolo,DELETE", 
+    "C;READ_POSSIBLE_VALUES;cuenta_Guaripolo",
+    // T1 será aceptado por 2 transacciones de 3. Logra Quorum.
+    "T1;CAN_COMMIT;SucursalNorte",
+    "T1;CAN_COMMIT;SucursalCentro",
+    "T1;COMMIT",
+    "C;READ_COMMIT;cuenta_Guaripolo",
+    "C;READ_COMMIT;cuenta_Tulio"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+    "VALIDATION": "forward",
+    "SERVERS": [
+        "R1",
+        "R2"
+    ],
+    // Información inicial de la base de datos
+    "DATA": {
+        "VAR_1": "1",
+        "VAR_2": "Hola"
+    },
+    "TRANSACTIONS": [
+        // Consulta 1 - Ver valor consolidado de VAR_1 (Null)
+        "C;READ_COMMIT;VAR_NO_EXISTE",
+        // Comenzar Transacción 1
+        "T1;BEGIN",
+        "T1;READ;VAR_2",
+        "T1;WRITE;VAR_1,4444",
+        // Consulta 2 - Ver valores posibles de VAR_1 (1 o 4444)
+        "C;READ_POSSIBLE_VALUES;VAR_1",
+        // Comenzar Transacción 2
+        "T2;BEGIN",
+        // T2 lee VAR_1, que fue modificado por T1
+        "T2;READ;VAR_1",
+
+        // R1 y R2 rechaza T1 porque VAR_1 es leído por T2
+        "T1;CAN_COMMIT;R1",
+        "T1;CAN_COMMIT;R2",
+
+        // T2 se vuelve una transacción inválida
+        "T2;READ;VAR_XXXX",
+
+        // R1 y R2 ahora si acepta T1 porque T2 ya no es válido
+        "T1;CAN_COMMIT;R1",
+        "T1;CAN_COMMIT;R2",
+        "T1;COMMIT",
+        
+        // Comenzar Transacción 3
+        "T3;BEGIN",
+        "T3;WRITE;VAR_1,3",
+        // Consulta 3 - Ver valores posibles de VAR_1 (2 o 3)
+        "C;READ_POSSIBLE_VALUES;VAR_1",
+        // Consulta 4 - Ver valores posibles de VAR_1 (2 o 3)
+        "C;READ_POSSIBLE_VALUES;VAR_1"
+    ]
+}

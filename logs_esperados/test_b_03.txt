@@ -1,0 +1,11 @@
+##LOGS##
+["juan carlos"]
+NULL
+##DATABASE##
+VAR_3=otro valor
+##STATS##
+ABIERTA=[]
+ABORTADA=[]
+CONFIRMADA=["T1", "T2", "T3"]
+EN_PREPARACION=[]
+INVALIDA=[]

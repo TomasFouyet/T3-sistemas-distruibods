@@ -1,0 +1,46 @@
+################
+### BACKWARD ###
+################
+
+-- test_b_01.jsonc 
+T1 modifica X
+T2 empieza
+T1 hace commit
+T2 lee X 
+Aunque T2 va a ser invalida ahora, igual afecta al resultado de READ_POSSIBLE_VALUES
+porque todavía no es declarada inválida o abortada
+T2 hace CAN_COMMIT y ahí es rechazada por la validación backward. La obligan a abortar.
+Ahora si READ_POSSIBLE_VALUES ya no ve el valor de T2
+
+-- test_b_02.jsonc 
+T1 hace CAN_COMMIT para reservar variables
+T2 lo rechazan por conflicto read-write con las variables reservadas.
+T2 podría commitear a futuro si T1 aborta, así que afecta a la consulta READ_POSSIBLE_VALUES
+Al final, T1 hace commit y T2 decida abortar
+
+-- test_b_03.jsonc 
+2 transacciones leen la misma variable, pero no hay conflictos read-write
+así que ambas pueden commitear sin problema
+
+Luego, está T3 que usará los comandos DELETE
+
+################
+### FORWARD ###
+################
+
+-- test_f_01.jsonc 
+T2 lee variables que T1 hizo write, así que T1 no puede hacer CAN_COMMIT
+T2 se vuelve inválido.. ahora T1 si puede hacer CAN_COMMIT y COMMIT
+
+-- test_f_02.jsonc 
+T1 escribe X es aceptado por R1 y R2
+T2 lee X y es rechazado por R1 y R2 porque X ya está reservado
+T1 commit... T2 no pasa nada porque no estaba en CAN_COMMIT.
+T2 ahora si hace CAN_COMMIT y es aceptado.
+T2 le rechazan el COMMIT y lo obligan a abortar.
+
+-- test_f_03.jsonc 
+T1 escribe X es aceptado por R1 y R2
+T2 lee X y es rechazado por R1 y R2 porque X ya está reservado.
+T2 intenta con R3 y ahí es aceptado su CAN_COMMIT.
+T1 commit porque tiene mayoría. R3 se entera de esto y fuerza a T2 a ser abortada.

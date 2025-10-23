@@ -1,0 +1,46 @@
+{
+    "VALIDATION": "backward",
+    "SERVERS": [
+        "R1",
+        "R2"
+    ],
+    // Información inicial de la base de datos
+    "DATA": {
+        "VAR_1": "1",
+        "VAR_2": "Hola"
+    },
+    "TRANSACTIONS": [
+        // Consulta 1 - Ver valor consolidado de VAR_1
+        "C;READ_COMMIT;VAR_1",
+        // Comenzar Transacción 1
+        "T1;BEGIN",
+        "T1;READ;VAR_2",
+        "T1;WRITE;VAR_1,2",
+        // Consulta 2 - Ver valores posibles de VAR_1 (1 o 2)
+        "C;READ_POSSIBLE_VALUES;VAR_1",
+
+        // Comenzar Transacción 2
+        "T2;BEGIN",
+        // T1 hace CAN_COMMIT para reservar variables, pero no commit
+        "T1;CAN_COMMIT;R1",
+        "T1;CAN_COMMIT;R2",
+
+        // T2 intenta leer VAR_1, que fue modificado por T1
+        "T2;READ;VAR_1",
+        "T2;WRITE;VAR_4,4444",
+        // R1 y R2 rechazan T2 porque T1 tiene reservada VAR_1 que T2 quiere usar
+        "T2;CAN_COMMIT;R1",
+        "T2;CAN_COMMIT;R2",
+        
+        // Consulta 3 - Ver valores posibles de VAR_1 (1, 2 o 4444)
+        "C;READ_POSSIBLE_VALUES;VAR_1",
+        // T2 no puede hacer commit porque no tiene quorum
+        "T2;COMMIT",
+        // T2 aborta
+        "T2;ABORT",
+        "T2;WRITE;VAR_1,4444", // No tiene efecto porque T2 ya finalizó
+        "T1;COMMIT",
+        // Consulta 4 - Ver valores posibles de VAR_1 (2)
+        "C;READ_POSSIBLE_VALUES;VAR_1"
+    ]
+}

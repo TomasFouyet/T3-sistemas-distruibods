@@ -1,0 +1,14 @@
+##LOGS##
+1
+["1", "2"]
+["1", "2"]
+["2"]
+##DATABASE##
+VAR_1=2
+VAR_2=Hola
+##STATS##
+ABIERTA=[]
+ABORTADA=["T2"]
+CONFIRMADA=["T1"]
+EN_PREPARACION=[]
+INVALIDA=[]
