@@ -147,7 +147,7 @@ class Simulator:
 
     def comando_leer(self, transaction_id: str, var: str):
         transaction = self.crear_tx(transaction_id)
-        if transaction.is_final() or transaction.begin_step < 0:
+        if transaction.tx_finalizada() or transaction.begin_step < 0:
             return
         if transaction.state == TransactionState.EN_PREPARACION:
             transaction.state = TransactionState.INVALIDA
@@ -163,7 +163,7 @@ class Simulator:
 
     def comando_write(self, transaction_id: str, var: str, val: str):
         transaction = self.crear_tx(transaction_id)
-        if transaction.is_final() or transaction.begin_step < 0:
+        if transaction.tx_finalizada() or transaction.begin_step < 0:
             return
 
         if transaction.state == TransactionState.EN_PREPARACION:
@@ -178,7 +178,7 @@ class Simulator:
 
     def comando_can_commit(self, transaction_id: str, server_name: str):
         transaction = self.crear_tx(transaction_id)
-        if transaction.is_final() or transaction.begin_step < 0:
+        if transaction.tx_finalizada() or transaction.begin_step < 0:
             return
         if server_name not in self.server_names_set:
             return
@@ -201,13 +201,13 @@ class Simulator:
 
     def comando_abort(self, transaction_id: str):
         transaction = self.crear_tx(transaction_id)
-        if transaction.is_final() or transaction.begin_step < 0:
+        if transaction.tx_finalizada() or transaction.begin_step < 0:
             return
         self.abandonar_tx(transaction)
 
     def comando_commit(self, transaction_id: str):
         transaction = self.crear_tx(transaction_id)
-        if transaction.is_final() or transaction.begin_step < 0:
+        if transaction.tx_finalizada() or transaction.begin_step < 0:
             return
 
         if self.stop_backward(transaction):
@@ -280,96 +280,3 @@ class Simulator:
         for t in self.transactions.values():
             by_state[t.state.value].append(t.id)
         return by_state
-
-    def ejecutar(self):
-        self.cargar()
-        for raw in self.transactions_script:
-            self.step_counter += 1
-            line = raw.strip()
-            if not line:
-                continue
-
-            if line.startswith("C;"):
-                parts = line.split(";", 2)
-                if len(parts) < 3:
-                    continue
-                _, qtype, arg = parts[0], parts[1], parts[2]
-                if qtype == "READ_COMMIT":
-                    self.read_query_commit(arg)
-                elif qtype == "READ_POSSIBLE_VALUES":
-                    self.read_possible_values(arg)
-                continue
-
-            parts = line.split(";", 2)
-            if len(parts) < 2:
-                continue
-            transaction_id, comando = parts[0], parts[1]
-            args = parts[2] if len(parts) == 3 else None
-
-            if comando != "BEGIN":
-                transaction = self.crear_tx(transaction_id)
-                if transaction.begin_step < 0 and comando not in {"BEGIN"}:
-                    continue
-
-            if comando == "BEGIN":
-                self.comando_start(transaction_id)
-            elif comando == "READ":
-                if args is not None:
-                    self.comando_leer(transaction_id, args)
-            elif comando == "WRITE":
-                if args is not None and "," in args:
-                    var, val = args.split(",", 1)
-                    self.comando_write(transaction_id, var, val)
-            elif comando == "CAN_COMMIT":
-                if args is not None:
-                    self.comando_can_commit(transaction_id, args)
-            elif comando == "COMMIT":
-                self.comando_commit(transaction_id)
-            elif comando == "ABORT":
-                self.comando_abort(transaction_id)
-
-        self.print_results()
-
-    def print_results(self):
-        base_name = os.path.basename(self.test_path)
-        name_txt = os.path.splitext(base_name)[0] + ".txt"
-        out_dir = "logs"
-        os.makedirs(out_dir, exist_ok=True)
-        out_path = os.path.join(out_dir, name_txt)
-
-        lines: list[str] = []
-        lines.append("##LOGS##")
-        if len(self.logs) == 0:
-            lines.append("No hay logs")
-        else:
-            lines.extend(self.logs)
-
-        lines.append("##DATABASE##")
-        if len(self.db) == 0:
-            lines.append("No hay datos")
-        else:
-            for k, v in self.db.items():
-                lines.append(f"{k}={v}")
-
-        by_state: dict[TransactionState, list[str]] = {
-            TransactionState.ABIERTA: [],
-            TransactionState.ABORTADA: [],
-            TransactionState.CONFIRMADA: [],
-            TransactionState.EN_PREPARACION: [],
-            TransactionState.INVALIDA: [],
-        }
-        for transaction in self.transactions.values():
-            by_state[transaction.state].append(transaction.id)
-
-        lines.append("##STATS##")
-        def j(lst: list[str]) -> str:
-            return json.dumps(lst)
-
-        lines.append(f'ABIERTA={j(by_state[TransactionState.ABIERTA])}')
-        lines.append(f'ABORTADA={j(by_state[TransactionState.ABORTADA])}')
-        lines.append(f'CONFIRMADA={j(by_state[TransactionState.CONFIRMADA])}')
-        lines.append(f'EN_PREPARACION={j(by_state[TransactionState.EN_PREPARACION])}')
-        lines.append(f'INVALIDA={j(by_state[TransactionState.INVALIDA])}')
-
-        with open(out_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines))

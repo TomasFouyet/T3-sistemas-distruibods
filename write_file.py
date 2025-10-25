@@ -1,6 +1,5 @@
 import os
 import json
-import typing
 
 LOGS_HEADER = "##LOGS##"
 DB_HEADER = "##DATABASE##"
@@ -14,10 +13,10 @@ def base_name(input_path: str) -> str:
     name = os.path.basename(input_path)
     return os.path.splitext(name)[0]
 
-def write_results(
+def write_finals_results(
     input_path: str,
     log_lines: list[str],
-    final_db: dict[str, str],
+    db: dict[str, str],
     stats: dict[str, list[str]],
 ) -> None:
     
@@ -28,22 +27,22 @@ def write_results(
     lines: list[str] = []
     lines.append(LOGS_HEADER)
     if len(log_lines) == 0:
-        lines.append("No hay logs")
+        lines.append("No hubo logs")
     else:
         lines.extend(log_lines)
 
     lines.append(DB_HEADER)
-    if len(final_db) == 0:
+    if len(db) == 0:
         lines.append("No hay datos")
     else:
-        for k, v in final_db.items():
+        for k, v in db.items():
             lines.append(f"{k}={v}")
 
     lines.append(STATS_HEADER)
-    order = ["ABIERTA", "ABORTADA", "CONFIRMADA", "EN_PREPARACION", "INVALIDA"]
-    for key in order:
-        arr = stats.get(key, [])
-        lines.append(f"{key}={json.dumps(arr)}")
+    estados = ["ABIERTA", "ABORTADA", "CONFIRMADA", "EN_PREPARACION", "INVALIDA"]
+    for estado in estados:
+        arr = stats.get(estado, [])
+        lines.append(f"{estado}={json.dumps(arr)}")
 
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))

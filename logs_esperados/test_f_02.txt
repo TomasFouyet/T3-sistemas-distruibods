@@ -1,5 +1,5 @@
 ##LOGS##
-No hay logs
+No hubo logs
 ##DATABASE##
 X=T1
 ##STATS##

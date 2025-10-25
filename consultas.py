@@ -1,7 +1,7 @@
 import json
 
 def ver_query(line: str) -> bool:
-    print("linea empieza con C; ", line.startswith("C;"))
+    # print("linea empieza con C; ", line.startswith("C;"))
     return line.startswith("C;")
 
 def query_handler(line: str, engine) -> str:

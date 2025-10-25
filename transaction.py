@@ -14,10 +14,10 @@ class Transaction:
     write_set: set[str] = dataclasses.field(default_factory=set)
     accepted_servers: set[str] = dataclasses.field(default_factory=set)
 
-    def can_execute(self) -> bool:
-        return self.state in {TransactionState.ABIERTA, 
-        TransactionState.EN_PREPARACION}
-
-    def is_final(self) -> bool:
-        return self.state in {TransactionState.CONFIRMADA, 
-        TransactionState.ABORTADA, TransactionState.INVALIDA}
+    def tx_finalizada(self) -> bool:
+        estados_finales = {
+            TransactionState.CONFIRMADA,
+            TransactionState.ABORTADA,
+            TransactionState.INVALIDA
+        }
+        return self.state in estados_finales

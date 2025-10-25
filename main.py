@@ -2,9 +2,6 @@ from __future__ import annotations
 from sys import argv
 import json
 
-# Librerías adicionales por si las necesitan
-# No son obligatorias y tampoco tienen que usarlas todas
-# No puedes agregar ningún otro import que no esté en esta lista
 import re
 import os
 import typing
@@ -14,7 +11,7 @@ import dataclasses
 import enum
 
 from read_file import read_file
-from write_file import write_results
+from write_file import write_finals_results
 from consultas import ver_query, query_handler
 from simulator import Simulator
 
@@ -26,8 +23,7 @@ def main():
     input_path = argv[1]
     data = read_file(input_path)
 
-    # Inicializa el motor desde dict (sin que el simulador escriba archivos)
-    sim = Simulator(test_path=input_path)  # test_path solo por compatibilidad
+    sim = Simulator(test_path=input_path)
     sim.init_from_dict(data)
 
     eventos: list[str] = data.get("TRANSACTIONS", [])
@@ -46,10 +42,10 @@ def main():
     final_db = sim.get_final_database()
     stats = sim.get_stats()
 
-    write_results(
+    write_finals_results(
         input_path=input_path,
         log_lines=logs,
-        final_db=final_db,
+        db=final_db,
         stats=stats,
     )
 
