@@ -23,7 +23,7 @@ class Simulator:
     def _strip_jsonc_comments(raw: str) -> str:
         return re.sub(r"//.*", "", raw)
 
-    def load(self):
+    def cargar(self):
         with open(self.test_path, encoding="utf-8") as f:
             raw = f.read()
         clean = self._strip_jsonc_comments(raw)
@@ -32,23 +32,35 @@ class Simulator:
         self.validation = (data.get("VALIDATION") or "").strip().lower()
         servers = data.get("SERVERS", [])
         self.servers = {name: Server(name) for name in servers}
-        self.server_names_set = set(servers)    
+        self.server_names_set = set(servers)
         self.db = dict(data.get("DATA", {}))
         self.transactions_script: list[str] = list(data.get("TRANSACTIONS", []))
 
-    def _get_or_create_transaction(self, transaction_id: str) -> Transaction:
+    def init_from_dict(self, data: dict) -> None:
+        """Inicializa el simulador con un dict ya parseado (sin escribir archivos)."""
+        self.validation = (data.get("VALIDATION") or "").strip().lower()
+        servers = data.get("SERVERS", [])
+        self.servers = {name: Server(name) for name in servers}
+        self.server_names_set = set(servers)
+        self.db = dict(data.get("DATA", {}))
+        self.transactions = {}
+        self.logs = []
+        self.step_counter = 0
+        self.committed_history = []
+
+    def crear_tx(self, transaction_id: str) -> Transaction:
         if transaction_id not in self.transactions:
             self.transactions[transaction_id] = Transaction(id=transaction_id)
         return self.transactions[transaction_id]
 
-    def _abort_transaction(self, transaction: Transaction):
+    def abandonar_tx(self, transaction: Transaction):
         if transaction.state in {TransactionState.ABORTADA, TransactionState.CONFIRMADA}:
             return
         transaction.state = TransactionState.ABORTADA
         for s in self.servers.values():
             s.release(transaction.id)
 
-    def _finalize_commit(self, transaction: Transaction):
+    def terminar_commit(self, transaction: Transaction):
         for var in transaction.write_set:
             val = transaction.local_db.get(var, None)
             if val == DELETE_SENTINEL:
@@ -61,89 +73,87 @@ class Simulator:
         for s in self.servers.values():
             s.release(transaction.id)
 
-        self.committed_history.append((transaction.commit_step, 
-                                      transaction.id, set(transaction.write_set)))
+        self.committed_history.append(
+            (transaction.commit_step, transaction.id, set(transaction.write_set))
+        )
 
         written = set(transaction.write_set)
         if not written:
             return
+
         for other in self.transactions.values():
             if other.state in {TransactionState.EN_PREPARACION, TransactionState.ABIERTA}:
                 accepted_somewhere = any(
                     s.has_accepted(other.id) for s in self.servers.values()
                 )
                 if accepted_somewhere and (other.read_set & written):
-                    self._abort_transaction(other)
+                    self.abandonar_tx(other)
 
-    def _conflict_read_write(self, A_read: set[str], A_write: set[str],
-                             B_read: set[str], B_write: set[str]) -> bool:
+    def conflicto_rw(self, A_read: set[str], A_write: set[str],
+                     B_read: set[str], B_write: set[str]) -> bool:
         return bool((A_write & B_read) or (B_write & A_read))
 
-    def _cc_forward_reject(self, cand: Transaction) -> bool:
+    def reject_forward(self, cand: Transaction) -> bool:
         for other in self.transactions.values():
             if other.id == cand.id:
                 continue
             if other.state in {TransactionState.ABIERTA, TransactionState.EN_PREPARACION}:
-                if self._conflict_read_write(
+                if self.conflicto_rw(
                     cand.read_set, cand.write_set, other.read_set, other.write_set
                 ):
                     return True
         return False
 
-    def _cc_backward_reject_and_abort(self, cand: Transaction) -> bool:
+    def stop_backward(self, cand: Transaction) -> bool:
         if cand.begin_step < 0:
             return False
         for commit_step, _, wset in self.committed_history:
             if commit_step >= cand.begin_step and (wset & cand.read_set):
-                self._abort_transaction(cand)
+                self.abandonar_tx(cand)
                 return True
         return False
 
-    def _twopc_reservation_reject(self, server: Server, cand: Transaction) -> bool:
+    def reject_reservation(self, server: Server, cand: Transaction) -> bool:
         for rec in server.accepted.values():
-            if rec.id == cand.id:
+            if rec.transaction_id == cand.id:
                 continue
-            if self._conflict_read_write(
+            if self.conflicto_rw(
                 cand.read_set, cand.write_set, rec.read_set, rec.write_set
             ):
                 return True
         return False
 
-    def _query_read_commit(self, var: str):
+    def read_query_commit(self, var: str):
         val = self.db.get(var, None)
         self.logs.append(val if val is not None else "NULL")
 
-    def _query_read_possible_values(self, var: str):
+    def read_possible_values(self, var: str):
         possible: set[str] = set()
         if var in self.db:
             possible.add(self.db[var])
         for transaction in self.transactions.values():
-            if transaction.state in {TransactionState.ABIERTA, 
-                                     TransactionState.EN_PREPARACION}:
-            
+            if transaction.state in {TransactionState.ABIERTA, TransactionState.EN_PREPARACION}:
                 if var in transaction.write_set:
                     val = transaction.local_db.get(var, None)
                     if val is not None and val != DELETE_SENTINEL:
                         possible.add(val)
         self.logs.append(json.dumps(list(possible)))
 
-    def _cmd_begin(self, transaction_id: str):
-        transaction = self._get_or_create_transaction(transaction_id)
+    def comando_start(self, transaction_id: str):
+        transaction = self.crear_tx(transaction_id)
         if transaction.state != TransactionState.ABIERTA or transaction.begin_step >= 0:
             return
         transaction.begin_step = self.step_counter
 
-    def _cmd_read(self, transaction_id: str, var: str):
-        transaction = self._get_or_create_transaction(transaction_id)
+    def comando_leer(self, transaction_id: str, var: str):
+        transaction = self.crear_tx(transaction_id)
         if transaction.is_final() or transaction.begin_step < 0:
             return
         if transaction.state == TransactionState.EN_PREPARACION:
             transaction.state = TransactionState.INVALIDA
             return
 
-        exists_local = var in transaction.local_db and \
-                              transaction.local_db[var] != DELETE_SENTINEL
-
+        exists_local = (var in transaction.local_db) and (transaction.local_db[var] != DELETE_SENTINEL)
         exists_global = var in self.db
         if not exists_local and not exists_global:
             transaction.state = TransactionState.INVALIDA
@@ -151,10 +161,11 @@ class Simulator:
 
         transaction.read_set.add(var)
 
-    def _cmd_write(self, transaction_id: str, var: str, val: str):
-        transaction = self._get_or_create_transaction(transaction_id)
+    def comando_write(self, transaction_id: str, var: str, val: str):
+        transaction = self.crear_tx(transaction_id)
         if transaction.is_final() or transaction.begin_step < 0:
             return
+
         if transaction.state == TransactionState.EN_PREPARACION:
             transaction.state = TransactionState.INVALIDA
             return
@@ -165,22 +176,22 @@ class Simulator:
             transaction.local_db[var] = val
         transaction.write_set.add(var)
 
-    def _cmd_can_commit(self, transaction_id: str, server_name: str):
-        transaction = self._get_or_create_transaction(transaction_id)
+    def comando_can_commit(self, transaction_id: str, server_name: str):
+        transaction = self.crear_tx(transaction_id)
         if transaction.is_final() or transaction.begin_step < 0:
             return
         if server_name not in self.server_names_set:
             return
-        server = self.servers[server_name]
 
+        server = self.servers[server_name]
         if server.has_accepted(transaction.id):
             return
 
         if self.validation == "backward":
-            if self._cc_backward_reject_and_abort(transaction):
+            if self.stop_backward(transaction):
                 return
 
-        if self._twopc_reservation_reject(server, transaction):
+        if self.reject_reservation(server, transaction):
             return
 
         server.accept(transaction)
@@ -188,18 +199,18 @@ class Simulator:
         if transaction.state == TransactionState.ABIERTA:
             transaction.state = TransactionState.EN_PREPARACION
 
-    def _cmd_abort(self, transaction_id: str):
-        transaction = self._get_or_create_transaction(transaction_id)
+    def comando_abort(self, transaction_id: str):
+        transaction = self.crear_tx(transaction_id)
         if transaction.is_final() or transaction.begin_step < 0:
             return
-        self._abort_transaction(transaction)
+        self.abandonar_tx(transaction)
 
-    def _cmd_commit(self, transaction_id: str):
-        transaction = self._get_or_create_transaction(transaction_id)
+    def comando_commit(self, transaction_id: str):
+        transaction = self.crear_tx(transaction_id)
         if transaction.is_final() or transaction.begin_step < 0:
             return
 
-        if self._cc_backward_reject_and_abort(transaction):
+        if self.stop_backward(transaction):
             return
 
         cond2_ok = transaction.state != TransactionState.INVALIDA
@@ -208,12 +219,70 @@ class Simulator:
         cond1_ok = len(transaction.accepted_servers) >= quorum
 
         if cond1_ok and cond2_ok:
-            self._finalize_commit(transaction)
-        else:
-            pass
+            self.terminar_commit(transaction)
 
-    def run(self):
-        self.load()
+    def apply_txn_event(self, line: str) -> None:
+        self.step_counter += 1
+        parts = line.split(";", 2)
+        if len(parts) < 2:
+            return
+        transaction_id, comando = parts[0], parts[1]
+        args = parts[2] if len(parts) == 3 else None
+
+        if comando != "BEGIN":
+            transaction = self.crear_tx(transaction_id)
+            if transaction.begin_step < 0 and comando not in {"BEGIN"}:
+                return
+
+        if comando == "BEGIN":
+            self.comando_start(transaction_id)
+        elif comando == "READ":
+            if args is not None:
+                self.comando_leer(transaction_id, args)
+        elif comando == "WRITE":
+            if args is not None and "," in args:
+                var, val = args.split(",", 1)
+                self.comando_write(transaction_id, var, val)
+        elif comando == "CAN_COMMIT":
+            if args is not None:
+                self.comando_can_commit(transaction_id, args)
+        elif comando == "COMMIT":
+            self.comando_commit(transaction_id)
+        elif comando == "ABORT":
+            self.comando_abort(transaction_id)
+
+
+    def get_committed_value(self, var: str) -> str | None:
+        return self.db.get(var)
+
+    def get_possible_values(self, var: str) -> set[str]:
+        possible: set[str] = set()
+        if var in self.db:
+            possible.add(self.db[var])
+        for t in self.transactions.values():
+            if t.state in {TransactionState.ABIERTA, TransactionState.EN_PREPARACION} and var in t.write_set:
+                val = t.local_db.get(var)
+                if val is not None and val != DELETE_SENTINEL:
+                    possible.add(val)
+        return possible
+
+    def get_final_database(self) -> dict[str, str]:
+        return dict(self.db)
+
+    def get_stats(self) -> dict[str, list[str]]:
+        by_state = {
+            "ABIERTA": [],
+            "ABORTADA": [],
+            "CONFIRMADA": [],
+            "EN_PREPARACION": [],
+            "INVALIDA": [],
+        }
+        for t in self.transactions.values():
+            by_state[t.state.value].append(t.id)
+        return by_state
+
+    def ejecutar(self):
+        self.cargar()
         for raw in self.transactions_script:
             self.step_counter += 1
             line = raw.strip()
@@ -226,42 +295,42 @@ class Simulator:
                     continue
                 _, qtype, arg = parts[0], parts[1], parts[2]
                 if qtype == "READ_COMMIT":
-                    self._query_read_commit(arg)
+                    self.read_query_commit(arg)
                 elif qtype == "READ_POSSIBLE_VALUES":
-                    self._query_read_possible_values(arg)
+                    self.read_possible_values(arg)
                 continue
 
             parts = line.split(";", 2)
             if len(parts) < 2:
                 continue
-            transaction_id, cmd = parts[0], parts[1]
+            transaction_id, comando = parts[0], parts[1]
             args = parts[2] if len(parts) == 3 else None
 
-            if cmd != "BEGIN":
-                transaction = self._get_or_create_transaction(transaction_id)
-                if transaction.begin_step < 0 and cmd not in {"BEGIN"}:
+            if comando != "BEGIN":
+                transaction = self.crear_tx(transaction_id)
+                if transaction.begin_step < 0 and comando not in {"BEGIN"}:
                     continue
 
-            if cmd == "BEGIN":
-                self._cmd_begin(transaction_id)
-            elif cmd == "READ":
+            if comando == "BEGIN":
+                self.comando_start(transaction_id)
+            elif comando == "READ":
                 if args is not None:
-                    self._cmd_read(transaction_id, args)
-            elif cmd == "WRITE":
+                    self.comando_leer(transaction_id, args)
+            elif comando == "WRITE":
                 if args is not None and "," in args:
                     var, val = args.split(",", 1)
-                    self._cmd_write(transaction_id, var, val)
-            elif cmd == "CAN_COMMIT":
+                    self.comando_write(transaction_id, var, val)
+            elif comando == "CAN_COMMIT":
                 if args is not None:
-                    self._cmd_can_commit(transaction_id, args)
-            elif cmd == "COMMIT":
-                self._cmd_commit(transaction_id)
-            elif cmd == "ABORT":
-                self._cmd_abort(transaction_id)
+                    self.comando_can_commit(transaction_id, args)
+            elif comando == "COMMIT":
+                self.comando_commit(transaction_id)
+            elif comando == "ABORT":
+                self.comando_abort(transaction_id)
 
-        self._emit_results()
+        self.print_results()
 
-    def _emit_results(self):
+    def print_results(self):
         base_name = os.path.basename(self.test_path)
         name_txt = os.path.splitext(base_name)[0] + ".txt"
         out_dir = "logs"

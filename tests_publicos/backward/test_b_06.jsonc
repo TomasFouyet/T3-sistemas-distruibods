@@ -1,0 +1,15 @@
+{
+  "VALIDATION": "backward",
+  "SERVERS": ["R1", "R2", "R3"],
+  "DATA": {"Y": "a"},
+  "TRANSACTIONS": [
+    "T1;BEGIN",
+    "T1;WRITE;Y,b",
+    "T1;CAN_COMMIT;R1",
+    "T1;COMMIT",                     // sin quórum (solo 1 de 3) → no consolida
+    "C;READ_COMMIT;Y",               // -> "a"
+    "T1;CAN_COMMIT;R2",
+    "T1;COMMIT",                     // ahora sí
+    "C;READ_COMMIT;Y"                // -> "b"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "VALIDATION": "backward",
+  "SERVERS": ["R1", "R2"],
+  "DATA": {"Z": "z0"},
+  "TRANSACTIONS": [
+    "T1;BEGIN",
+    "T1;WRITE;Z,DELETE",
+    "T1;CAN_COMMIT;R1",
+    "T1;CAN_COMMIT;R2",
+    "T1;COMMIT",                     // Elimina Z
+    "C;READ_COMMIT;Z",               // -> NULL
+    "C;READ_POSSIBLE_VALUES;Z"       // -> []
+  ]
+}

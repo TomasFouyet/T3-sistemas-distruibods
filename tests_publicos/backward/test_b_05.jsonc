@@ -1,0 +1,18 @@
+{
+  "VALIDATION": "backward",
+  "SERVERS": ["R1", "R2", "R3"],
+  "DATA": {"X": "0"},
+  "TRANSACTIONS": [
+    "T2;BEGIN",
+    "T2;READ;X",
+    "T2;CAN_COMMIT;R1",          // T2 en preparación (solo R1)
+
+    "T1;BEGIN",
+    "T1;WRITE;X,5",
+    "T1;CAN_COMMIT;R2",          // acepta (no hay reserva en R2)
+    "T1;CAN_COMMIT;R3",          // acepta (no hay reserva en R3)
+    "T1;COMMIT",                 // quórum 2/3 -> consolida, X=5
+
+    "C;READ_COMMIT;X"            // -> 5
+  ]
+}

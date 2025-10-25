@@ -1,7 +1,8 @@
 ##LOGS##
-["Fibonacci", "1123581321"]
+["1"]
+["1"]
 ##DATABASE##
-X=1123581321
+X=1
 ##STATS##
 ABIERTA=[]
 ABORTADA=["T2"]

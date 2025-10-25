@@ -1,0 +1,17 @@
+{
+  "VALIDATION": "forward",
+  "SERVERS": ["S1", "S2"],
+  "DATA": {"X": "orig"},
+  "TRANSACTIONS": [
+    "T1;BEGIN",
+    "T1;WRITE;X,9",
+    "T1;CAN_COMMIT;S1",
+    "T1;CAN_COMMIT;s1",              // Ignorado (servidor inexistente)
+    "T1;CAN_COMMIT;S1",              // Ignorado (idempotente)
+    "T1;COMMIT",                     // Sin quórum (necesita 2): no consolida
+    "C;READ_COMMIT;X",               // -> "orig"
+    "T1;CAN_COMMIT;S2",
+    "T1;COMMIT",                     // Ahora sí consolida
+    "C;READ_COMMIT;X"                // -> "9"
+  ]
+}

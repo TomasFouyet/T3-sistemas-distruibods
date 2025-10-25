@@ -1,0 +1,16 @@
+{
+  "VALIDATION": "forward",
+  "SERVERS": ["S1", "S2"],
+  "DATA": {"A": "10"},
+  "TRANSACTIONS": [
+    "T1;BEGIN",
+    "T1;WRITE;A,DELETE",
+    "T2;BEGIN",
+    "T2;WRITE;A,20",
+    "C;READ_POSSIBLE_VALUES;A",      // -> ["10","20"] (T1-DELETE no aporta)
+    "T1;CAN_COMMIT;S1",
+    "T1;CAN_COMMIT;S2",
+    "T1;COMMIT",                     // Elimina A
+    "C;READ_COMMIT;A"                // -> NULL
+  ]
+}

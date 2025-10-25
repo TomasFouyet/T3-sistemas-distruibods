@@ -1,0 +1,18 @@
+{
+  "VALIDATION": "backward",
+  "SERVERS": ["R1", "R2"],
+  "DATA": {"X": "0"},
+  "TRANSACTIONS": [
+    "T1;BEGIN",
+    "T1;READ;X",
+    "T1;WRITE;X,1",
+    "T1;CAN_COMMIT;R1",
+    "T1;CAN_COMMIT;R2",
+    "T2;BEGIN",
+    "T2;READ;X",
+    "T1;COMMIT",                     // CONFIRMA X=1
+    "C;READ_POSSIBLE_VALUES;X",      // -> ["1"]
+    "T2;CAN_COMMIT;R1",              // backward: detecta conflicto (desde BEGIN de T2) → ABORTA T2
+    "C;READ_POSSIBLE_VALUES;X"       // -> ["1"] (T2 ya no aporta)
+  ]
+}

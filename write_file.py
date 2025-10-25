@@ -28,7 +28,7 @@ def write_results(
     lines: list[str] = []
     lines.append(LOGS_HEADER)
     if len(log_lines) == 0:
-        lines.append("No hubo logs")
+        lines.append("No hay logs")
     else:
         lines.extend(log_lines)
 

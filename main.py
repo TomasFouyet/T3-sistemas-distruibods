@@ -16,58 +16,42 @@ import enum
 from read_file import read_file
 from write_file import write_results
 from consultas import ver_query, query_handler
+from simulator import Simulator
+
 
 def main():
     if len(argv) < 2:
-
         return
 
     input_path = argv[1]
     data = read_file(input_path)
 
-    initial_db: dict[str, str] = data.get("DATA", {})
-    servers: list[str] = data.get("SERVERS", [])
-    validation: str = data.get("VALIDATION", "forward")
-    eventos: list[str] = data.get("TRANSACTIONS", [])
-    print("Inicializando sistema con:")
-    print("- Base de datos inicial:", initial_db)
-    print("- Servidores:", servers)
-    print("- Modo de validación:", validation)
-    print("- Eventos de transacciones:", eventos)
+    # Inicializa el motor desde dict (sin que el simulador escriba archivos)
+    sim = Simulator(test_path=input_path)  # test_path solo por compatibilidad
+    sim.init_from_dict(data)
 
-    
-    
-    ## FALTA INSTANCIAR MOTOR DE TRANSACCIONES
-    
-    
+    eventos: list[str] = data.get("TRANSACTIONS", [])
     logs: list[str] = []
 
-    for linea in eventos:
-        
+    for line in eventos:
         line = line.strip()
-        print("Procesando línea:", line)
         if not line:
             continue
-
         if ver_query(line):
-            print("Es una consulta.")
-            out_line = query_handler(line, tm)
-            print("Resultado de la consulta:", out_line)
+            out_line = query_handler(line, sim)
             logs.append(out_line)
         else:
-            print("Es un comando de transacción.")
-            # Comandos de transacciones (Parte A)
-            ## FALTA IMPLEMENTAR EL MANEJADOR DE EVENTOS
-            
+            sim.apply_txn_event(line)
 
-    # Salida final
-    ## FALTA OBTENER BASE DE DATOS FINAL Y ESTADÍSTICAS
+    final_db = sim.get_final_database()
+    stats = sim.get_stats()
+
     write_results(
         input_path=input_path,
         log_lines=logs,
-        ## AGREGAR BASE DE DATOS FINAL Y ESTADÍSTICAS
+        final_db=final_db,
+        stats=stats,
     )
-
 
 if __name__ == "__main__":
     main()

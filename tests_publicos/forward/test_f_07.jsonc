@@ -1,0 +1,14 @@
+{
+  "VALIDATION": "forward",
+  "SERVERS": ["R1", "R2"],
+  "DATA": {"K": "v"},
+  "TRANSACTIONS": [
+    "T1;BEGIN",
+    "T1;WRITE;K,a",
+    "T1;CAN_COMMIT;R1",
+    "T1;CAN_COMMIT;R2",              // EN_PREPARACION
+    "T1;WRITE;K,b",                  // Prohibido → INVALIDA
+    "T1;COMMIT",                     // cond2 falla → no consolida
+    "C;READ_COMMIT;K"                // -> "v"
+  ]
+}

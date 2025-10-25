@@ -1,0 +1,17 @@
+{
+  "VALIDATION": "forward",
+  "SERVERS": ["R1", "R2", "R3"],
+  "DATA": {},
+  "TRANSACTIONS": [
+    "T1;READ;X",                     // Ignorado (no ha hecho BEGIN)
+    "C;READ_COMMIT;X",               // -> NULL
+    "T1;BEGIN",
+    "T1;BEGIN",                      // Ignorado (BEGIN duplicado)
+    "T1;WRITE;X,1",
+    "C;READ_POSSIBLE_VALUES;X",      // -> ["1"]
+    "T1;CAN_COMMIT;R1",
+    "T1;CAN_COMMIT;R2",
+    "T1;COMMIT",                     // Quórum ok: consolida
+    "C;READ_COMMIT;X"                // -> 1
+  ]
+}

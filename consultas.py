@@ -1,23 +1,25 @@
 import json
-import typing
 
 def ver_query(line: str) -> bool:
-    print("Verificando si es query:", line)
+    print("linea empieza con C; ", line.startswith("C;"))
     return line.startswith("C;")
 
-def query_handler(line: str, txn_manager) -> str:
-    _, query, var = line.split(";", 2)
-    var = var.strip()
+def query_handler(line: str, engine) -> str:
+    # print( line)
+    
+    parts = [p.strip() for p in line.split(";", 2)]
+    if len(parts) < 3:
+        return ""
+    _, query, var = parts
 
     if query == "READ_POSSIBLE_VALUES":
-        print("Manejando READ_POSSIBLE_VALUESs para variable:", var)
-       ## FALTA IMPLEMENTAR READ_POSSIBLE_VALUES
-        #return json.dumps(list(values))
+        # print("ENTRE AQUI EN READ POSSIBLE VALUES")
+        values = engine.get_possible_values(var)
+        return json.dumps(list(values))
 
     if query == "READ_COMMIT":
-        print("Manejando READ_COMMIT para variable:", var)
-         ## FALTA IMPLEMENTAR READ_COMMIT
-        #return val if val is not None else "NULL"
+        # print("ENTRE AQUI EN READ COMMIT")
+        val = engine.get_committed_value(var)
+        return val if val is not None else "NULL"
 
-    print("Tipo de query desconocido:", query)
     return ""

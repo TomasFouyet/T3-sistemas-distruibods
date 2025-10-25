@@ -1,0 +1,11 @@
+##LOGS##
+["10","20"]
+NULL
+##DATABASE##
+No hay datos
+##STATS##
+ABIERTA=["T2"]
+ABORTADA=[]
+CONFIRMADA=["T1"]
+EN_PREPARACION=[]
+INVALIDA=[]
