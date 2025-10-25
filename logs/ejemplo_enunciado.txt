@@ -1,0 +1,16 @@
+##LOGS##
+["1000"]
+500
+["1000", "900"]
+["1000"]
+NULL
+123
+##DATABASE##
+cuenta_Bodoque=600
+cuenta_Tulio=123
+##STATS##
+ABIERTA=[]
+ABORTADA=[]
+CONFIRMADA=["T1"]
+EN_PREPARACION=[]
+INVALIDA=[]

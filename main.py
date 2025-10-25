@@ -1,4 +1,4 @@
-from __future__ import annotations  # Solo lo dejo por si lo necesitan. Lo pueden eliminar
+from __future__ import annotations
 from sys import argv
 import json
 
